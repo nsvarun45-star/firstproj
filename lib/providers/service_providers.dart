@@ -16,7 +16,7 @@ import '../services/timer_service.dart';
 /// Singleton BLE service. autoDispose is intentionally NOT used here
 /// because the BLE connection should persist for the app's lifetime.
 final bleServiceProvider = Provider<BleService>((ref) {
-  final service = BleServiceImpl();
+  final service = RealBleServiceImpl();
   ref.onDispose(service.dispose);
   return service;
 });

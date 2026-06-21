@@ -16,8 +16,7 @@
 
 import 'dart:async';
 import 'dart:math';
-// REAL BLE INTEGRATION: uncomment to use flutter_blue_plus for a real device.
-// import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/ble_models.dart';
 
 enum BleConnectionState { disconnected, connecting, connected }
@@ -238,6 +237,113 @@ class MockBleSimulator implements BleService {
   void dispose() {
     _scriptTimer?.cancel();
     _cleaningTimer?.cancel();
+    _telemetryController.close();
+    _connectionController.close();
+  }
+}
+
+class RealBleServiceImpl implements BleService {
+  static const String deviceName = "LensGuard-ESP32";
+  static final Guid serviceUuid = Guid("0000FFE0-0000-1000-8000-00805F9B34FB");
+  static final Guid charUuid = Guid("0000FFE1-0000-1000-8000-00805F9B34FB");
+
+  final _telemetryController = StreamController<LensCaseTelemetry>.broadcast();
+  final _connectionController = StreamController<BleConnectionState>.broadcast();
+
+  LensCaseTelemetry _state = LensCaseTelemetry.initial();
+  BluetoothDevice? _device;
+  BluetoothCharacteristic? _char;
+  StreamSubscription? _connectionSub;
+  StreamSubscription? _notifySub;
+
+  @override
+  Stream<LensCaseTelemetry> get telemetryStream => _telemetryController.stream;
+
+  @override
+  Stream<BleConnectionState> get connectionStateStream => _connectionController.stream;
+
+  @override
+  Future<void> connectDevice() async {
+    _connectionController.add(BleConnectionState.connecting);
+
+    // 1. Scan for the device
+    FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+    BluetoothDevice? targetDevice;
+
+    await for (final results in FlutterBluePlus.scanResults) {
+      for (final r in results) {
+        if (r.device.platformName == deviceName || r.advertisementData.advName == deviceName) {
+          targetDevice = r.device;
+          break;
+        }
+      }
+      if (targetDevice != null) break;
+    }
+    FlutterBluePlus.stopScan();
+
+    if (targetDevice == null) {
+      _connectionController.add(BleConnectionState.disconnected);
+      throw Exception("ESP32 BLE device not found");
+    }
+
+    _device = targetDevice;
+
+    // Listen to connection state changes
+    _connectionSub = _device!.connectionState.listen((state) {
+      if (state == BluetoothConnectionState.connected) {
+        _connectionController.add(BleConnectionState.connected);
+      } else {
+        _connectionController.add(BleConnectionState.disconnected);
+      }
+    });
+
+    // 2. Connect
+    await _device!.connect();
+
+    // 3. Discover Services
+    final services = await _device!.discoverServices();
+    final service = services.firstWhere(
+      (s) => s.uuid == serviceUuid,
+      orElse: () => throw Exception("Service not found"),
+    );
+
+    _char = service.characteristics.firstWhere(
+      (c) => c.uuid == charUuid,
+      orElse: () => throw Exception("Characteristic not found"),
+    );
+
+    // 4. Set notify and listen
+    await _char!.setNotifyValue(true);
+    _notifySub = _char!.lastValueStream.listen((bytes) {
+      final line = String.fromCharCodes(bytes);
+      final lines = line.split('\n');
+      for (var l in lines) {
+        if (l.trim().isNotEmpty) {
+          _state = parseIncomingData(l, _state);
+          _telemetryController.add(_state);
+        }
+      }
+    });
+  }
+
+  @override
+  Future<void> disconnectDevice() async {
+    _notifySub?.cancel();
+    _connectionSub?.cancel();
+    await _device?.disconnect();
+    _connectionController.add(BleConnectionState.disconnected);
+  }
+
+  @override
+  Future<void> sendStartCleaning() async {
+    if (_char != null) {
+      await _char!.write("START_CLEANING".codeUnits);
+    }
+  }
+
+  @override
+  void dispose() {
+    disconnectDevice();
     _telemetryController.close();
     _connectionController.close();
   }
