@@ -17,6 +17,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/ble_models.dart';
 
 enum BleConnectionState { disconnected, connecting, connected }
@@ -265,6 +266,16 @@ class RealBleServiceImpl implements BleService {
   @override
   Future<void> connectDevice() async {
     _connectionController.add(BleConnectionState.connecting);
+
+    // Request BLE and Location permissions at runtime
+    final permissions = [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.location,
+    ];
+    
+    // This will show standard runtime permission dialogs on the phone.
+    await permissions.request();
 
     // 1. Scan for the device
     FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
