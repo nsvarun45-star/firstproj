@@ -278,19 +278,22 @@ class RealBleServiceImpl implements BleService {
     await permissions.request();
 
     // 1. Scan for the device
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
     BluetoothDevice? targetDevice;
-
-    await for (final results in FlutterBluePlus.scanResults) {
+    final scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
         if (r.device.platformName == deviceName || r.advertisementData.advName == deviceName) {
           targetDevice = r.device;
+          FlutterBluePlus.stopScan();
           break;
         }
       }
-      if (targetDevice != null) break;
-    }
-    FlutterBluePlus.stopScan();
+    });
+
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+    
+    // Wait until scanning stops (either due to timeout or finding the device)
+    await FlutterBluePlus.isScanning.where((val) => val == false).first;
+    await scanSub.cancel();
 
     if (targetDevice == null) {
       _connectionController.add(BleConnectionState.disconnected);
