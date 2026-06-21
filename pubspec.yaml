@@ -1,0 +1,63 @@
+name: lensguard
+description: "LensGuard - Smart Contact Lens Cleaning Case companion app"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Bluetooth Low Energy
+  flutter_blue_plus: ^1.32.7
+
+  # Local notifications
+  flutter_local_notifications: ^17.2.2
+
+  # Animations
+  lottie: ^3.1.2
+  flutter_animate: ^4.5.0
+
+  # Local persistence for history & settings
+  shared_preferences: ^2.2.3
+
+  # Charts for solution quality / history trends
+  fl_chart: ^0.68.0
+
+  # Utilities
+  intl: ^0.19.0
+  uuid: ^4.4.0
+  permission_handler: ^11.3.1
+  vibration: ^2.0.1
+  audioplayers: ^6.0.0
+
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/animations/
+    - assets/images/
+
+# -----------------------------------------------------------------------------
+# NOTES FOR DEVELOPER:
+# - Run `flutter pub get` after extracting this project.
+# - Lottie animation JSON files referenced in code are NOT bundled (placeholder
+#   paths are provided under assets/animations/). Replace with real Lottie
+#   files downloaded from lottiefiles.com, or the app will gracefully fall
+#   back to icon-based animations where implemented.
+# - This project uses MOCK BLE data via lib/services/ble_service.dart's
+#   MockBleSimulator. Real ESP32 integration points are clearly marked with
+#   "REAL BLE INTEGRATION" comments for swapping in flutter_blue_plus calls.
+# -----------------------------------------------------------------------------
